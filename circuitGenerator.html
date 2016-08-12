@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 80%;
+      }
+      #rightPanel {
+        width: 20%;
+      }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAgYkwnqTzocw-XbCbw5AunyBOCM36IIiA&callback=initMap"
+        async defer></script>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="sidePanel">
+      <input type="text" id="desiredDistance" value=5>
+      <input type="submit" id="submit">
+      <div id="actualDistance"/>
+    </div>
+    <script>
+      var distance = 5; //In km
+      var numWaypoints;
+      var totalWaypoints;
+      var minWaypoints = 3;
+      var maxWaypoints = 8;
+      var bearing;
+      var rotationDir;
+
+      var map;
+      var markerPositions = [];
+      var markers = [];
+      var startPoint = null;
+      var startMarker = null;
+
+      Number.prototype.toRad = function() {
+        return this * Math.PI / 180;
+      }
+
+      Number.prototype.toDeg = function() {
+        return this * 180 / Math.PI;
+      }
+
+      function initMap() {
+
+        google.maps.LatLng.prototype.destinationPoint = function(bearing, dist) {
+          dist = dist / 6371; //Earth radius in km
+          bearing = bearing.toRad();
+
+          var lat1 = this.lat().toRad(), lon1 = this.lng().toRad();
+          var lat2 = Math.asin(Math.sin(lat1) * Math.cos(dist) + Math.cos(lat1) * Math.sin(dist) * Math.cos(bearing));
+          var lon2 = lon1 + Math.atan2(Math.sin(bearing) * Math.sin(dist) * Math.cos(lat1), Math.cos(dist) - Math.sin(lat1) * Math.sin(lat2));
+
+          if(isNaN(lat2) || isNaN(lon2)) return null;
+
+          return new google.maps.LatLng(lat2.toDeg(), lon2.toDeg());
+        }
+
+        var chicago = {lat: 41.85, lng: -87.65};
+
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: chicago,
+          zoom: 3
+        });
+
+        var directionsService = new google.maps.DirectionsService;
+        var directionsDisplay = new google.maps.DirectionsRenderer({
+          map: map
+        });
+
+        document.getElementById('submit').addEventListener('click', function() {
+          calculateRoute(directionsService, directionsDisplay);
+        });
+
+        map.addListener('click', function(event) {
+          addStartMarker(event.latLng);
+        });
+      }
+
+      function addStartMarker(location) {
+        if(startMarker !== null) {
+          clearAllMarkers();
+          startMarker = null;
+          startPoint = null;
+        }
+
+        distance = Number(document.getElementById("desiredDistance").value);
+        totalWaypoints = numWaypoints = Math.floor(Math.random() * ((maxWaypoints + 1) - minWaypoints) + minWaypoints);
+        bearing = Math.floor(Math.random() * 360);
+        rotationDir = Math.random() > 0.5 ? 1 : -1;
+
+        startPoint = new google.maps.LatLng(location.lat(), location.lng());
+        markerPositions.push(startPoint);
+        markers.push(startMarker = new google.maps.Marker({
+          position: startPoint,
+          map: map
+        }));
+
+        var secondPoint = startPoint.destinationPoint(bearing, distance / totalWaypoints);
+        markerPositions.push(secondPoint);
+        markers.push(new google.maps.Marker({
+          position: secondPoint,
+          map: map
+        }));
+
+        numWaypoints -= 2;
+
+        addWaypointMarkers(secondPoint)
+      }
+
+      function addWaypointMarkers(secondPoint) {
+        var bearingDelta = 360 / totalWaypoints;
+        var lastPoint = secondPoint;
+        var randomBearingRotDelta;
+        var randomDistanceDelta;
+
+        while(numWaypoints > 0) {
+          randomBearingRotDelta = Math.floor(Math.random() * 20) - 10;
+          randomDistanceDelta = (Math.random() * 2) - 1;
+
+          bearing += (bearingDelta + randomBearingRotDelta) * rotationDir;
+
+          var currentPoint = lastPoint.destinationPoint(bearing, (distance + randomDistanceDelta) / totalWaypoints);
+
+          markerPositions.push(currentPoint);
+          markers.push(new google.maps.Marker({
+            position: currentPoint,
+            map: map
+          }));
+
+          numWaypoints--;
+
+          lastPoint = currentPoint;
+        }
+      }
+
+      function clearMarker(marker) {
+        var index = markers.indexOf(marker);
+
+        marker.setMap(null);
+        markers.splice(index, 1);
+        markerPositions.splice(index, 1);
+      }
+
+      function clearAllMarkers() {
+        for (var i = markers.length - 1; i >= 0; i--) {
+          clearMarker(markers[i]);
+        }
+        markers = [];
+        markerPositions = [];
+      }
+
+      function calculateRoute(directionsService, directionsDisplay) {
+        var waypointLatLng = markerPositions.slice(1, markerPositions.length);
+        var waypoints = [];
+
+        for (var i = waypointLatLng.length - 1; i >= 0; i--) {
+          waypoints.push({location: waypointLatLng[i], stopover: true});
+        }
+
+        var request = {
+          origin: startPoint,
+          destination: startPoint,
+          waypoints: waypoints,
+          optimizeWaypoints: true,
+          travelMode: 'WALKING',
+          avoidHighways: true
+        };
+
+        directionsService.route(request, function(response, status) {
+          if (status == 'OK') {
+            directionsDisplay.setDirections(response);
+
+            clearAllMarkers();
+
+            console.log(response);
+
+            var legs = response.routes[0].legs;
+            var totalDist = 0;
+            for (var i = legs.length - 1; i >= 0; i--) {
+              totalDist += legs[i].distance.value;
+            }
+
+            document.getElementById('actualDistance').innerHTML = (totalDist / 1000) + "km";
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
