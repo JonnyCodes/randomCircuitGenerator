@@ -10,7 +10,7 @@
       #map {
         height: 80%;
       }
-      #rightPanel {
+      #sidePanel {
         width: 20%;
       }
     </style>
@@ -20,9 +20,10 @@
   <body>
     <div id="map"></div>
     <div id="sidePanel">
-      <input type="text" id="desiredDistance" value=5>
-      <input type="submit" id="submit">
-      <div id="actualDistance"/>
+    	Desired Length (km)
+    	<input type="text" id="desiredDistance" value=5>
+    	<button type="button" id="generateBtn">Generate</button>
+    	<div id="actualDistance"/>
     </div>
     <script>
       var distance = 5; //In km
@@ -74,7 +75,7 @@
           map: map
         });
 
-        document.getElementById('submit').addEventListener('click', function() {
+        document.getElementById('generateBtn').addEventListener('click', function() {
           calculateRoute(directionsService, directionsDisplay);
         });
 
@@ -187,7 +188,7 @@
               totalDist += legs[i].distance.value;
             }
 
-            document.getElementById('actualDistance').innerHTML = (totalDist / 1000) + "km";
+            document.getElementById('actualDistance').innerHTML = "Actual Length: " + (totalDist / 1000) + "km";
           }
         });
       }
